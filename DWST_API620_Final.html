@@ -2723,6 +2723,11 @@ function exportPDF() {
     margin:{left:14}, tableWidth: W-28 });
   const twEl = document.getElementById('totalWeight');
   if (twEl) { y = doc.lastAutoTable.finalY + 2; doc.setFontSize(9); doc.setTextColor(0,140,100); doc.setFont(undefined,'bold'); doc.text('Total Shell Weight: ' + twEl.textContent, 14, y); y += 7; }
+  // Where note (highlighted in Word doc)
+  doc.setFontSize(8); doc.setTextColor(40,40,40); doc.setFont(undefined,'normal');
+  doc.text('Where,', 14, y); y += 5;
+  doc.text('  td is required thickness of shell during normal operation', 14, y); y += 5;
+  doc.text('  tt is required thickness for hydrotest condition', 14, y); y += 7;
 
   // === SECTION 3A: Seismic Spectra ===
   checkPage(50);
@@ -2777,6 +2782,25 @@ function exportPDF() {
   // === SECTION 4: Seismic ===
   checkPage(50);
   addTitle('4. Seismic Analysis Results');
+  // Time period formulas (highlighted in Word doc)
+  const Ti_pdf = parseFloat(document.getElementById('s_Ti_calc')?.value||'0').toFixed(4);
+  const Tc_pdf = parseFloat(document.getElementById('s_Tc_calc')?.value||'0').toFixed(2);
+  const D_m_pdf = (parseFloat(document.getElementById('D_mm')?.value)||45000)/1000;
+  const H_m_pdf = (parseFloat(document.getElementById('Hd_mm')?.value)||18000)/1000;
+  const Ks_pdf  = (0.578/Math.sqrt(Math.tanh(3.68*(H_m_pdf/D_m_pdf)))).toFixed(5);
+  doc.setFontSize(9); doc.setTextColor(30,60,120); doc.setFont(undefined,'bold');
+  doc.text('Time period for Impulsive mode:', 14, y); y += 5;
+  doc.setFont(undefined,'normal'); doc.setTextColor(40,40,40); doc.setFontSize(8.5);
+  doc.text('  Ti = Ci · H · √(ρ/E) / √(2000) · √(tU/D)', 14, y); y += 6;
+  doc.setFontSize(9); doc.setTextColor(30,60,120); doc.setFont(undefined,'bold');
+  doc.text('Time period for Convective mode:', 14, y); y += 5;
+  doc.setFont(undefined,'normal'); doc.setTextColor(40,40,40); doc.setFontSize(8.5);
+  doc.text('  Tc = 1.8 · Ks · √D', 14, y); y += 5;
+  doc.text('  Where, Ks = 0.578 / √[tanh(3.68 · H/D)]  =  ' + Ks_pdf, 14, y); y += 6;
+  doc.setFont(undefined,'bold'); doc.setTextColor(0,140,100);
+  doc.text('  Ti = ' + Ti_pdf + ' sec', 14, y); y += 5;
+  doc.text('  Tc = ' + Tc_pdf + ' sec', 14, y); y += 8;
+  doc.setFont(undefined,'normal');
   const seisRows = [];
   document.querySelectorAll('#seismicResultsBody tr').forEach(tr => {
     const cells = [...tr.querySelectorAll('td')];
@@ -2921,26 +2945,50 @@ function exportPDF() {
 
   // === SECTION 10: Stiffener Sizing Table ===
   checkPage(40);
-  addTitle('10. Stiffener Sizing – I_req vs I_prov');
+  addTitle('10. Stiffener Sizing - I_req vs I_prov');
   const sizingRows = [];
   document.querySelectorAll('#stiffSizingBody tr').forEach(tr => {
     const cells = [...tr.querySelectorAll('td')];
-    if (cells.length >= 16) {
-      // Extract text; for input cells get the input value
-      const row = cells.map(c => {
-        const inp = c.querySelector('input');
-        return inp ? inp.value : c.textContent.trim();
-      });
+    if (cells.length >= 17) {
+      // Table has 18 cols: No | Auto-Loc | User-Loc | tj | aj | aj*tj | Cov | NRj | ts | beff | tw | hw | tf | bf | I_req | I_prov | Wt | Check
+      // Skip col[1] (auto-calc loc) - use only user-input loc col[2]
+      const getCell = (c) => { const inp = c.querySelector('input'); return inp ? inp.value : c.textContent.trim().replace(/\s+/g,' '); };
+      const row = [
+        getCell(cells[0]),  // No.
+        getCell(cells[2]),  // User Loc (mm) - col index 2, skip auto-calc col[1]
+        getCell(cells[3]),  // tj
+        getCell(cells[4]),  // aj
+        getCell(cells[5]),  // aj*tj
+        getCell(cells[6]),  // Covered
+        getCell(cells[7]),  // NRj(N)
+        getCell(cells[8]),  // ts
+        getCell(cells[9]),  // beff
+        getCell(cells[10]), // tw
+        getCell(cells[11]), // hw
+        getCell(cells[12]), // tf
+        getCell(cells[13]), // bf
+        getCell(cells[14]), // I_req
+        getCell(cells[15]), // I_prov
+        getCell(cells[16]), // Wt(kg)
+        getCell(cells[17]), // Check
+      ];
       sizingRows.push(row);
     }
   });
   if (sizingRows.length) {
     doc.autoTable({ startY: y,
-      head:[['No.','Loc(mm)','tj','aj','aj·tj','Cov.','NRj(N)','ts','beff','tw','hw','tf','bf','I_req(mm⁴)','I_prov(mm⁴)','Wt(kg)','Check']],
+      head:[['No.','Loc(mm)','tj(mm)','aj(mm)','aj*tj','Cov.(mm)','NRj(N)','ts(mm)','beff(mm)','tw(mm)','hw(mm)','tf(mm)','bf(mm)','I_req(mm4)','I_prov(mm4)','Wt(kg)','Check']],
       body: sizingRows,
-      headStyles:{fillColor:[30,48,80],textColor:255,fontSize:6},
-      bodyStyles:{fontSize:6.5}, alternateRowStyles:{fillColor:[240,244,255]},
-      margin:{left:14}, tableWidth: W-28 });
+      headStyles:{fillColor:[30,48,80],textColor:255,fontSize:6.5,halign:'center'},
+      bodyStyles:{fontSize:7,halign:'center'},
+      alternateRowStyles:{fillColor:[240,244,255]},
+      margin:{left:14}, tableWidth: W-28,
+      columnStyles:{
+        0:{cellWidth:10}, 1:{cellWidth:18}, 2:{cellWidth:12}, 3:{cellWidth:12},
+        4:{cellWidth:14}, 5:{cellWidth:16}, 6:{cellWidth:16}, 7:{cellWidth:12},
+        8:{cellWidth:16}, 9:{cellWidth:12}, 10:{cellWidth:14}, 11:{cellWidth:12},
+        12:{cellWidth:13}, 13:{cellWidth:18}, 14:{cellWidth:18}, 15:{cellWidth:13}, 16:{cellWidth:13}
+      }});
     y = doc.lastAutoTable.finalY + 5;
     // mb, H115, I_max summary line
     const mbV    = document.getElementById('st_mb')?.value    || '—';
@@ -3215,7 +3263,7 @@ async function exportWord() {
       })),
     });
     const mkTable = (headers, rows) => new Table({
-      width: { size: 100, type: WidthType.PERCENTAGE },
+      width: { size: 14400, type: WidthType.DXA },
       rows: [mkHdr(...headers), ...rows.map(r => mkRow(...r))],
     });
 
@@ -3315,6 +3363,10 @@ async function exportWord() {
       mkTable(['Course','Width(m)','Hd(m)','Ht(m)','td(mm)','tt(mm)','t_req(mm)','t_adopted(mm)','Weight'], thRows),
       para('Total Shell Weight: ' + t('totalWeight'), { bold: true, color: C_TEAL }),
       blank(),
+      para('Where,', { bold: false, color: '2a2a2a' }),
+      para('  td is required thickness of shell during normal operation', { color: '2a2a2a' }),
+      para('  tt is required thickness for hydrotest condition', { color: '2a2a2a' }),
+      blank(),
     ];
 
     /* §3A  Response Spectra */
@@ -3358,8 +3410,23 @@ async function exportWord() {
 
     /* §4  Seismic Analysis */
     const seisRows = tr2('seismicResultsBody').filter(r => r.length >= 5);
+    const Ti_val = v('s_Ti_calc');
+    const Tc_val = v('s_Tc_calc');
+    const D_m_s  = (parseFloat(document.getElementById('D_mm')?.value)||45000)/1000;
+    const H_m_s  = (parseFloat(document.getElementById('Hd_mm')?.value)||18000)/1000;
+    const Ks_val = (0.578/Math.sqrt(Math.tanh(3.68*(H_m_s/D_m_s)))).toFixed(5);
     const sec4 = [
       h2('4. Seismic Analysis Results'),
+      para('Time period for Impulsive mode:', { bold: true, color: '2a2a2a' }),
+      para('  Ti = Ci · H · √(ρ/E) / √(2000) · √(tU/D)', { color: '2a2a2a' }),
+      blank(),
+      para('Time period for Convective mode:', { bold: true, color: '2a2a2a' }),
+      para('  Tc = 1.8 · Ks · √D', { color: '2a2a2a' }),
+      para('  Where, Ks = 0.578 / √[tanh(3.68 · H/D)]  =  ' + Ks_val, { color: '2a2a2a' }),
+      blank(),
+      para('  Ti = ' + parseFloat(Ti_val).toFixed(4) + ' sec', { bold: true, color: C_TEAL }),
+      para('  Tc = ' + parseFloat(Tc_val).toFixed(2) + ' sec', { bold: true, color: C_TEAL }),
+      blank(),
       mkTable(['Parameter','Symbol','Formula','OLE Value','CLE Value','Unit'], seisRows.map(r => r.slice(0,6))),
       blank(),
     ];
@@ -3413,10 +3480,37 @@ async function exportWord() {
     ];
 
     /* §10  Stiffener Sizing */
-    const sizingRows = tr2('stiffSizingBody').filter(r => r.length >= 16);
+    // Table has 18 cols: No | Auto-Loc | User-Loc | tj | aj | aj*tj | Cov | NRj | ts | beff | tw | hw | tf | bf | I_req | I_prov | Wt | Check
+    // We skip col[1] (auto-calc loc) and use col[2] (user input loc)
+    const sizingRowsRaw = [];
+    document.querySelectorAll('#stiffSizingBody tr').forEach(tr => {
+      const cells = Array.from(tr.querySelectorAll('td'));
+      if (cells.length >= 17) {
+        const getCell = (c) => { const inp = c.querySelector('input'); return (inp ? inp.value : c.textContent.trim()).replace(/\s+/g,' '); };
+        sizingRowsRaw.push([
+          getCell(cells[0]),  // No.
+          getCell(cells[2]),  // User Loc (mm)
+          getCell(cells[3]),  // tj
+          getCell(cells[4]),  // aj
+          getCell(cells[5]),  // aj*tj
+          getCell(cells[6]),  // Covered
+          getCell(cells[7]),  // NRj(N)
+          getCell(cells[8]),  // ts
+          getCell(cells[9]),  // beff
+          getCell(cells[10]), // tw
+          getCell(cells[11]), // hw
+          getCell(cells[12]), // tf
+          getCell(cells[13]), // bf
+          getCell(cells[14]), // I_req
+          getCell(cells[15]), // I_prov
+          getCell(cells[16]), // Wt
+          getCell(cells[17]), // Check
+        ]);
+      }
+    });
     const sec10 = [
       h2('10. Stiffener Sizing — I_req vs I_prov'),
-      mkTable(['No.','Loc(mm)','tj','aj','aj·tj','Covered','NRj(N)','ts','beff','tw','hw','tf','bf','I_req(mm⁴)','I_prov(mm⁴)','Wt(kg)','Check'], sizingRows),
+      mkTable(['No.','Loc(mm)','tj(mm)','aj(mm)','aj*tj','Cov.(mm)','NRj(N)','ts(mm)','beff(mm)','tw(mm)','hw(mm)','tf(mm)','bf(mm)','I_req(mm4)','I_prov(mm4)','Wt(kg)','Check'], sizingRowsRaw),
       para('mb=' + v('st_mb') + '  |  H115=' + v('st_H115') + ' mm²  |  I_prov,max=' + v('st_I_max') + ' mm⁴  |  Total stiffener wt=' + v('st_wt_total') + ' kg', { color: C_TEAL }),
       blank(),
       para('Top Stiffener Sizing – Whessoe / Opal Method:', { bold: true }),
@@ -3522,11 +3616,11 @@ async function exportWord() {
       blank(),
     ];
     if (tankImgRun) {
-      sec13Content.push(new Paragraph({ children: [tankImgRun], spacing: { after: 120 } }));
+      sec14Content.push(new Paragraph({ children: [tankImgRun], spacing: { after: 120 } }));
     } else {
-      sec13Content.push(para('[Tank graphic: open the Tank Graphic tab first, then export]', { color: C_GRAY }));
+      sec14Content.push(para('[Tank graphic: open the Tank Graphic tab first, then export]', { color: C_GRAY }));
     }
-    sec13Content.push(para(
+    sec14Content.push(para(
       'ID=' + v('D_mm') + 'mm  ·  H=' + v('H_mm') + 'mm  ·  OD=' + v('w_OD_outer') + 'm' +
       '  ·  NOL=' + v('Hnorm_mm') + 'mm  ·  SG=' + v('SG') + '  ·  Tdes=' + v('Tdesign') + '°C' +
       '  ·  Stiffeners=' + t('stiffCount') + '  ·  Shell wt=' + t('ws_shell') + 'kg',
