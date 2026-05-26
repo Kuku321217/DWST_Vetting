@@ -1424,6 +1424,7 @@
         <div class="field"><label>Alpha Theta (α_θ)</label><input id="st_alphaTheta" type="number" step="0.01" value="0.5" oninput="computeStiffeners()"/></div>
         <div class="field"><label>Stiffener Spacing (L_s)</label><input id="st_Ls" type="number" value="2400" oninput="computeStiffeners()"/><span class="unit">mm</span></div>
         <div class="field"><label>Safety Factor</label><input id="st_SF" type="number" step="0.1" value="2" oninput="computeStiffeners()"/><span class="unit">J19 in Excel</span></div>
+        <div class="field"><label>t<sub>U</sub> – Equiv. shell thickness (for API-620 N₂)</label><input id="sei_tU" type="number" step="0.01" value="10.27" oninput="computeStiffeners()"/><span class="unit">mm &nbsp;⟵ auto-linked from Tab 3 Seismic (Sheet3 J16 = 10.27 mm)</span></div>
       </div>
       <div class="divider"></div>
       <div class="grid-4">
@@ -1586,7 +1587,7 @@
 
       <!-- Stiffener sizing table -->
       <div style="overflow-x:auto">
-        <table class="courses-table" id="stiffSizingTable" style="min-width:1500px">
+        <table class="courses-table" id="stiffSizingTable" style="min-width:2200px">
           <thead>
             <tr>
               <th rowspan="2" style="min-width:36px">No.</th>
@@ -1604,6 +1605,8 @@
               <th rowspan="2" style="min-width:100px">I<sub>prov</sub><br>(mm⁴)<br><small>R col</small></th>
               <th rowspan="2" style="min-width:75px">Weight<br>(kg)<br><small>S col</small></th>
               <th rowspan="2" style="min-width:70px">Check<br><small>T col</small></th>
+              <th colspan="4" style="background:var(--bg3);border-left:3px solid var(--accent2);color:var(--accent2);font-size:11px">⚡ API-620 MOI Check (cols U–Y)</th>
+              <th colspan="3" style="background:var(--bg3);border-left:3px solid var(--warn);color:var(--warn);font-size:11px">⚡ API-620 Area Check (cols Z–AB)</th>
             </tr>
             <tr>
               <th style="background:rgba(74,124,255,0.05)">✎ t<sub>s</sub> (mm)</th>
@@ -1612,11 +1615,31 @@
               <th style="background:rgba(245,166,35,0.05)">✎ h<sub>w</sub> (mm)</th>
               <th style="background:rgba(0,201,167,0.05)">✎ t<sub>f</sub> (mm)</th>
               <th style="background:rgba(0,201,167,0.05)">✎ b<sub>f</sub> (mm)</th>
+              <th style="background:var(--bg3);font-size:11px">L<sub>s</sub><br>(mm)<br>U col</th>
+              <th style="background:var(--bg3);font-size:11px">N<sub>2</sub><br>V col</th>
+              <th style="background:var(--bg3);font-size:11px">I<sub>req,API</sub><br>(mm⁴)<br>W col</th>
+              <th style="background:var(--bg3);font-size:11px">MOI<br>Check<br>Y col</th>
+              <th style="background:var(--bg3);font-size:11px;border-left:3px solid var(--warn)">A<sub>req</sub><br>(mm²)<br>Z col</th>
+              <th style="background:var(--bg3);font-size:11px">A<sub>prov</sub><br>(mm²)<br>AA col</th>
+              <th style="background:var(--bg3);font-size:11px">Area<br>Check<br>AB col</th>
             </tr>
           </thead>
           <tbody id="stiffSizingBody"></tbody>
         </table>
       </div>
+
+      <!-- API-620 Area Check Summary (cols Z, AA, AB) – always visible, no scrolling needed -->
+      <div id="areaCheckSummary" style="margin-top:14px;padding:14px 18px;border-radius:10px;background:var(--bg3);border:1px solid var(--border);">
+        <div style="font-weight:700;font-size:13px;color:var(--accent2);margin-bottom:10px">
+          ⚡ API-620 Shear Area Check (Excel cols Z–AB) &nbsp;|&nbsp;
+          A<sub>req</sub> = (P<sub>e,warm</sub> × L<sub>s</sub> × D) / (2 × 103.42) &nbsp;&nbsp;
+          A<sub>prov</sub> = t<sub>w</sub>·h<sub>w</sub> + t<sub>f</sub>·b<sub>f</sub> + b<sub>eff</sub>·t<sub>s</sub>
+        </div>
+        <div id="areaCheckRows" style="display:flex;flex-wrap:wrap;gap:10px;font-size:12px;font-family:'IBM Plex Mono',monospace">
+          <span style="color:var(--muted)">— compute stiffeners to populate —</span>
+        </div>
+      </div>
+
       <div class="info-banner" style="margin-top:12px;font-size:11.5px;line-height:1.8">
         <strong>Formulas (/ Excel Sheet6):</strong><br>
         a<sub>j</sub> = E[j+1]−E[j] (or H<sub>tank</sub>−E[j] for last); 
@@ -1625,6 +1648,18 @@
         b<sub>eff</sub> = 1.56·√(r·t<sub>s</sub>)+t<sub>w</sub>&emsp;|&emsp;
         I<sub>req</sub> = 2·N<sub>Rj,Ed</sub>·r<sub>m</sub>²/(E·m<sub>b</sub>²)·10¹² [mm⁴]&emsp;|&emsp;
         I<sub>prov</sub> = composite T-section MOI (shell plate b<sub>eff</sub>×t<sub>s</sub> + web t<sub>w</sub>×h<sub>w</sub> + flange t<sub>f</sub>×b<sub>f</sub>)
+        <br><br>
+        <strong style="color:var(--accent2)">⚡ API-620 MOI Section (cols U–Y) — exact Excel Sheet6 formulas:</strong><br>
+        <b>U</b> = L<sub>s</sub> = Covered range (a<sub>j</sub>+a<sub>j+1</sub>)/2 [mm] — same as col I&emsp;|&emsp;
+        <b>V</b> = N<sub>2</sub> = MIN(0.663·D<sub>mm</sub><sup>1.5</sup> / (H<sub>mm</sub>·√t<sub>U</sub>), 100) — seismic buckling mode number (t<sub>U</sub> from Seismic tab)&emsp;|&emsp;
+        <b>W</b> = I<sub>req,API</sub> = (SF · P<sub>e,warm</sub> · D<sub>mm</sub>³) / (8 · E<sub>N/mm²</sub>) / (N<sub>2</sub>−1) × L<sub>s</sub> [mm⁴]&emsp;|&emsp;
+        <b>X</b> = I<sub>prov</sub> — same composite T-section MOI as col R&emsp;|&emsp;
+        <b>Y</b> = Check: OK if I<sub>prov</sub> ≥ I<sub>req,API-620</sub>
+        <br><br>
+        <strong style="color:var(--warn)">⚡ API-620 Area Check (cols Z–AB) — Shear area adequacy of stiffener ring:</strong><br>
+        <b>Z</b> = A<sub>req</sub> = (P<sub>e,warm</sub> · L<sub>s</sub> · D<sub>mm</sub>) / (2 × 103.42) [mm²]&emsp;— required cross-sectional area; 103.42 MPa = allowable shear stress&emsp;|&emsp;
+        <b>AA</b> = A<sub>prov</sub> = t<sub>w</sub>·h<sub>w</sub> + t<sub>f</sub>·b<sub>f</sub> + b<sub>eff</sub>·t<sub>s</sub> [mm²]&emsp;— total T-section area&emsp;|&emsp;
+        <b>AB</b> = Check: OK if A<sub>prov</sub> ≥ A<sub>req</sub>
       </div>
     </div>
   </div>
@@ -2559,7 +2594,13 @@ function showTab(n) {
   if (n===2) computeSeismic();
   if (n===3) computeAnchor();
   if (n===4) computeExtPressure();
-  if (n===5) computeStiffeners();
+  if (n===5) {
+    // Auto-sync tU from Seismic tab (s_tU) to Stiffener tab (sei_tU) before computing
+    var sTu = document.getElementById('s_tU');
+    var seiTu = document.getElementById('sei_tU');
+    if (sTu && seiTu) { var v = parseFloat(sTu.value); if (isFinite(v) && v > 0) seiTu.value = v; }
+    computeStiffeners();
+  }
   if (n===7) computeCapacity();
   if (n===8) computeWeightSummary();
   if (n===9) computeTankGraphic();
@@ -2950,7 +2991,7 @@ function exportPDF() {
   document.querySelectorAll('#stiffSizingBody tr').forEach(tr => {
     const cells = [...tr.querySelectorAll('td')];
     if (cells.length >= 17) {
-      // Table has 18 cols: No | Auto-Loc | User-Loc | tj | aj | aj*tj | Cov | NRj | ts | beff | tw | hw | tf | bf | I_req | I_prov | Wt | Check
+      // Table has 25 cols: No | Auto-Loc | User-Loc | tj | aj | aj*tj | Cov | NRj | ts | beff | tw | hw | tf | bf | I_req | I_prov | Wt | Check | Ls_API | N2 | Ireq_API(W) | Check_API | A_req(Z) | A_prov(AA) | Check_Area(AB)
       // Skip col[1] (auto-calc loc) - use only user-input loc col[2]
       const getCell = (c) => { const inp = c.querySelector('input'); return inp ? inp.value : c.textContent.trim().replace(/\s+/g,' '); };
       const row = [
@@ -2967,27 +3008,60 @@ function exportPDF() {
         getCell(cells[11]), // hw
         getCell(cells[12]), // tf
         getCell(cells[13]), // bf
-        getCell(cells[14]), // I_req
+        getCell(cells[14]), // I_req (col K)
         getCell(cells[15]), // I_prov
         getCell(cells[16]), // Wt(kg)
         getCell(cells[17]), // Check
+        getCell(cells[18]), // Ls_API (col U)
+        getCell(cells[19]), // N2    (col V)
+        getCell(cells[20]), // Ireq_API (col W)
+        getCell(cells[21]), // Check_API (col Y)
+        getCell(cells[22]), // A_req  (col Z)
+        getCell(cells[23]), // A_prov (col AA)
+        getCell(cells[24]), // Check_Area (col AB)
       ];
       sizingRows.push(row);
     }
   });
   if (sizingRows.length) {
     doc.autoTable({ startY: y,
-      head:[['No.','Loc(mm)','tj(mm)','aj(mm)','aj*tj','Cov.(mm)','NRj(N)','ts(mm)','beff(mm)','tw(mm)','hw(mm)','tf(mm)','bf(mm)','I_req(mm4)','I_prov(mm4)','Wt(kg)','Check']],
+      head:[['No.','Loc(mm)','tj(mm)','aj(mm)','aj*tj','Cov.(mm)','NRj(N)','ts(mm)','beff(mm)','tw(mm)','hw(mm)','tf(mm)','bf(mm)','I_req(mm⁴)','I_prov(mm⁴)','Wt(kg)','Check','Ls(mm)\n[API]','N₂\n[API]','I_req,API\n(mm⁴) W','MOI\nCheck','A_req\n(mm²) Z','A_prov\n(mm²) AA','Area\nCheck AB']],
       body: sizingRows,
-      headStyles:{fillColor:[30,48,80],textColor:255,fontSize:6.5,halign:'center'},
-      bodyStyles:{fontSize:7,halign:'center'},
+      headStyles:{fillColor:[30,48,80],textColor:255,fontSize:6,halign:'center'},
+      bodyStyles:{fontSize:6.5,halign:'center'},
       alternateRowStyles:{fillColor:[240,244,255]},
-      margin:{left:14}, tableWidth: W-28,
+      margin:{left:8}, tableWidth: W-16,
+      didParseCell: function(data) {
+        // MOI yellow columns (17-20)
+        if (data.column.index >= 17 && data.column.index <= 20) {
+          if (data.section === 'head') {
+            data.cell.styles.fillColor = [180, 140, 0];
+            data.cell.styles.textColor = 255;
+          } else {
+            data.cell.styles.fillColor = [255, 248, 200];
+            data.cell.styles.textColor = [100, 70, 0];
+            data.cell.styles.fontStyle = 'bold';
+          }
+        }
+        // Area check amber columns (21-23)
+        if (data.column.index >= 21) {
+          if (data.section === 'head') {
+            data.cell.styles.fillColor = [160, 100, 0];
+            data.cell.styles.textColor = 255;
+          } else {
+            data.cell.styles.fillColor = [255, 235, 160];
+            data.cell.styles.textColor = [80, 45, 0];
+            data.cell.styles.fontStyle = 'bold';
+          }
+        }
+      },
       columnStyles:{
-        0:{cellWidth:10}, 1:{cellWidth:18}, 2:{cellWidth:12}, 3:{cellWidth:12},
-        4:{cellWidth:14}, 5:{cellWidth:16}, 6:{cellWidth:16}, 7:{cellWidth:12},
-        8:{cellWidth:16}, 9:{cellWidth:12}, 10:{cellWidth:14}, 11:{cellWidth:12},
-        12:{cellWidth:13}, 13:{cellWidth:18}, 14:{cellWidth:18}, 15:{cellWidth:13}, 16:{cellWidth:13}
+        0:{cellWidth:7},  1:{cellWidth:13}, 2:{cellWidth:9},  3:{cellWidth:9},
+        4:{cellWidth:11}, 5:{cellWidth:12}, 6:{cellWidth:13}, 7:{cellWidth:9},
+        8:{cellWidth:12}, 9:{cellWidth:9},  10:{cellWidth:11},11:{cellWidth:9},
+        12:{cellWidth:9}, 13:{cellWidth:14},14:{cellWidth:14},15:{cellWidth:9}, 16:{cellWidth:9},
+        17:{cellWidth:11},18:{cellWidth:9}, 19:{cellWidth:14},20:{cellWidth:10},
+        21:{cellWidth:12},22:{cellWidth:12},23:{cellWidth:10}
       }});
     y = doc.lastAutoTable.finalY + 5;
     // mb, H115, I_max summary line
@@ -3480,7 +3554,7 @@ async function exportWord() {
     ];
 
     /* §10  Stiffener Sizing */
-    // Table has 18 cols: No | Auto-Loc | User-Loc | tj | aj | aj*tj | Cov | NRj | ts | beff | tw | hw | tf | bf | I_req | I_prov | Wt | Check
+    // Table has 25 cols: No | Auto-Loc | User-Loc | tj | aj | aj*tj | Cov | NRj | ts | beff | tw | hw | tf | bf | I_req | I_prov | Wt | Check | Ls_API | N2 | Ireq_API(W) | Check_API | A_req(Z) | A_prov(AA) | Check_Area(AB)
     // We skip col[1] (auto-calc loc) and use col[2] (user input loc)
     const sizingRowsRaw = [];
     document.querySelectorAll('#stiffSizingBody tr').forEach(tr => {
@@ -3501,17 +3575,41 @@ async function exportWord() {
           getCell(cells[11]), // hw
           getCell(cells[12]), // tf
           getCell(cells[13]), // bf
-          getCell(cells[14]), // I_req
+          getCell(cells[14]), // I_req (col K)
           getCell(cells[15]), // I_prov
           getCell(cells[16]), // Wt
           getCell(cells[17]), // Check
+          cells.length > 18 ? getCell(cells[18]) : '—', // Ls_API (col U)
+          cells.length > 19 ? getCell(cells[19]) : '—', // N2    (col V)
+          cells.length > 20 ? getCell(cells[20]) : '—', // Ireq_API (col W)
+          cells.length > 21 ? getCell(cells[21]) : '—', // Check_API (col Y)
+          cells.length > 22 ? getCell(cells[22]) : '—', // A_req  (col Z)
+          cells.length > 23 ? getCell(cells[23]) : '—', // A_prov (col AA)
+          cells.length > 24 ? getCell(cells[24]) : '—', // Check_Area (col AB)
         ]);
       }
     });
     const sec10 = [
-      h2('10. Stiffener Sizing — I_req vs I_prov'),
-      mkTable(['No.','Loc(mm)','tj(mm)','aj(mm)','aj*tj','Cov.(mm)','NRj(N)','ts(mm)','beff(mm)','tw(mm)','hw(mm)','tf(mm)','bf(mm)','I_req(mm4)','I_prov(mm4)','Wt(kg)','Check'], sizingRowsRaw),
-      para('mb=' + v('st_mb') + '  |  H115=' + v('st_H115') + ' mm²  |  I_prov,max=' + v('st_I_max') + ' mm⁴  |  Total stiffener wt=' + v('st_wt_total') + ' kg', { color: C_TEAL }),
+      h2('10. Stiffener Sizing \u2014 I_req vs I_prov'),
+      mkTable(
+        ['No.','Loc(mm)','tj(mm)','aj(mm)','aj*tj','Cov.(mm)','NRj(N)','ts(mm)','beff(mm)','tw(mm)','hw(mm)','tf(mm)','bf(mm)','I_req(mm\u2074)','I_prov(mm\u2074)','Wt(kg)','Check'],
+        sizingRowsRaw.map(r => r.slice(0, 17))
+      ),
+      para('mb=' + v('st_mb') + '  |  H115=' + v('st_H115') + ' mm\u00B2  |  I_prov,max=' + v('st_I_max') + ' mm\u2074  |  Total stiffener wt=' + v('st_wt_total') + ' kg', { color: C_TEAL }),
+      blank(),
+      para('API-620 Appendix Q \u2014 Seismic MOI Check (Excel Sheet6 cols U\u2013Y):', { bold: true }),
+      para('N\u2082 = MIN(0.663\u00D7D\u00B9\u00B7\u2075/(H\u00D7\u221AtU),100)  |  I\u1D3F\u1D49\u1D60,API=(SF\u00D7Pe,warm\u00D7D\u00B3)/(8\u00D7E)/(N\u2082\u22121)\u00D7Ls', { color: '4a7cff', size: 18 }),
+      mkTable(
+        ['No.','Loc(mm)','Ls\u2009(mm)\n[col\u2009U]','N\u2082\n[col\u2009V]','I\u1D3F\u1D49\u1D60,API\u2009(mm\u2074)\n[col\u2009W]','I\u1D3F\u1D3C\u1D3E\u1D3B,\u1D3F (mm\u2074)','MOI\u2009Check\n[col\u2009Y]'],
+        sizingRowsRaw.map(r => [r[0], r[1], r[17], r[18], r[19], r[14], r[20]])
+      ),
+      blank(),
+      para('API-620 Appendix Q \u2014 Shear Area Check (Excel Sheet6 cols Z\u2013AB):', { bold: true }),
+      para('A\u1D3F\u1D49\u1D60 = (Pe,warm\u00D7Ls\u00D7D\u2098\u2098)/(2\u00D7103.42)  |  A\u1D3F\u1D3C\u1D3E\u1D3B = tw\u00B7hw+tf\u00B7bf+beff\u00B7ts  |  103.42 MPa = allowable shear stress', { color: '#6b3a00', size: 18 }),
+      mkTable(
+        ['No.','Loc(mm)','Ls\u2009(mm)','A\u1D3F\u1D49\u1D60\u2009(mm\u00B2)\n[col\u2009Z]','A\u1D3F\u1D3C\u1D3E\u1D3B\u2009(mm\u00B2)\n[col\u2009AA]','Area\u2009Check\n[col\u2009AB]'],
+        sizingRowsRaw.map(r => [r[0], r[1], r[17], r[21], r[22], r[23]])
+      ),
       blank(),
       para('Top Stiffener Sizing – Whessoe / Opal Method:', { bold: true }),
       mkTable(['Parameter','Value','Unit'], [
@@ -5025,23 +5123,28 @@ function computeStiffeners() {
 
   // ── aj (Excel col G) ─────────────────────────────────────────────────────
   // Excel formula (exact):
-  //   Stiff 1 (G104): = E104  (location from bottom = aj for first stiffener)
-  //   Stiff k>1 (G105..): = IF(E[k+1]=0, E115-E[k], E[k]-E[k-1])
-  //     i.e. if next stiffener is inactive (loc=0): aj = H_shell_total - loc[k]
-  //          otherwise: aj = loc[k] - loc[k-1]   (gap between this and previous)
-  // E115 = C43*10^3 = sum of all course widths × 1000 = total shell height in mm
-  var aj_s = sAct.map(function(d,k) {
-    if (k === 0) return d.loc;                           // G104 = E104
-    var nxt = k < nAct-1 ? sAct[k+1].loc : 0;           // loc of next active
-    return nxt > 0 ? d.loc - sAct[k-1].loc              // E[k] - E[k-1]
-                   : H_tank_mm - d.loc;                  // E115 - E[k]
+  //   G104 = IF(D104=$E$115, $E$115-E104, E104)
+  //   G105 = IF(D105=$E$115, $E$115-E104, E105-E104)
+  //   G[k] = IF(D[k]=H_tank, H_tank-E[k-1], E[k]-E[k-1])
+  //
+  // Key insight: D[k]=H_tank only for INACTIVE rows (loc=0, not in sAct).
+  // For ALL active stiffeners (loc>0, in sAct), D[k] ≠ H_tank, so:
+  //   aj[0] = loc[0]                 (E104 for first stiffener)
+  //   aj[k] = loc[k] - loc[k-1]     (E[k]-E[k-1] for all subsequent active stiffeners)
+  var aj_s = sAct.map(function(d, k) {
+    if (k === 0) return d.loc;                      // G104 = E104
+    return d.loc - sAct[k-1].loc;                  // G[k] = E[k] - E[k-1]
   });
 
-  // G_next(k): the aj of the next slot after stiffener k
-  //   if k is last active → next slot is inactive (loc=0) → G_next = H_tank - 0 = H_tank
-  //   otherwise G_next = aj_s[k+1]
+  // gNext(k): G value of the slot immediately after stiffener k (for covered range col I)
+  //   Excel I[k] = IF(G[k+1]=H_tank, 0, (G[k]+G[k+1])/2)
+  //   For active k < last:  G[k+1] = aj_s[k+1] = loc[k+1]-loc[k]
+  //   For last active k:    the next slot (inactive, D=H_tank) has
+  //                         G[k+1] = H_tank - E[k] = H_tank - loc[k]
+  //                         (NOT H_tank itself — that would give zero covered range)
   function gNext(k) {
-    return k < nAct-1 ? aj_s[k+1] : H_tank_mm;
+    if (k < nAct - 1) return aj_s[k + 1];           // next active stiffener's aj
+    return H_tank_mm - sAct[k].loc;                  // inactive row G = H_tank - last_loc
   }
 
   // ── Covered range I_j = (G_j + G_{j+1})/2 (Excel col I) ─────────────────
@@ -5059,6 +5162,89 @@ function computeStiffeners() {
   var beff_s = sAct.map(function(d) {
     return 1.56 * Math.sqrt(r_mm_ss * d.ts) + d.tw;
   });
+
+  // ── API-620 Yellow Section: N2 and I_req_API (cols U-Y in Excel Sheet6) ──────
+  // Exact Excel formulas:
+  //   U = I (Covered range = (aj+aj+1)/2) [mm]
+  //   V = N2 = MIN(0.663*(J2*1e3)^1.5 / (J3*1e3 * SQRT('3_Seismic'!J16)), 100)
+  //       J2=D(m)=45, J3=H(m)=18.5, SeismicJ16=tU(mm)=10.27
+  //       => N2 = MIN(0.663 * D_mm^1.5 / (H_mm * sqrt(tU_mm)), 100)
+  //   W = I_req_API = ((J19 * J16_stiff * (J2*1e3)^3) / (8 * J8*1e-6)) / (N2-1) * U
+  //       J19=SF=2, J16_stiff=Pe_warm(MPa)=0.002, J8=E(N/m2)=191e9
+  //       J8*1e-6 = 191000 N/mm2 = E_mpa  => divide by 8*E_mpa
+  //       => I_req = ((SF * Pe_warm * D_mm^3) / (8 * E_mpa)) / (N2-1) * Ls_mm
+  //   X = I_prov (same as col R – composite T-section MOI)
+  //   Y = OK if X >= W
+
+  // Read tU from stiffener tab input (id='sei_tU') first, then seismic tab (id='s_tU').
+  // sei_tU is checked first because it is the user-editable field on this tab and is
+  // always kept in sync with s_tU when the tab is opened (see showTab logic).
+  // A physical range guard (1–200 mm) rejects stale/unit-error values that would
+  // inflate N2 above 100 and produce Ireq_API values ~47% too low.
+  var tU_mm = (function() {
+    var ids = ['sei_tU', 's_tU'];
+    for (var ii = 0; ii < ids.length; ii++) {
+      var el = document.getElementById(ids[ii]);
+      if (el) {
+        var v = parseFloat(el.value !== undefined ? el.value : el.textContent);
+        if (isFinite(v) && v >= 1 && v <= 200) return v;
+      }
+    }
+    return 10.27;  // fallback: Excel Sheet3 J16 default (tU for this project)
+  })();
+
+  // N2 (col V) — seismic buckling mode number, constant for all stiffeners
+  // Excel: MIN(0.663*(D_mm)^1.5 / (H_mm * SQRT(tU_mm)), 100)
+  var N2_api = Math.min(
+    (0.663 * Math.pow(D_mm, 1.5)) / (H_mm * Math.sqrt(tU_mm)),
+    100
+  );
+
+  // I_req_API (col W) — API-620 required MOI per stiffener
+  // Formula: ((SF * Pe_warm[MPa] * D_mm^3) / (8 * E_mpa[N/mm2])) / (N2-1) * Ls[mm]
+  var Ireq_api_s = sAct.map(function(d, k) {
+    if (cov_s[k] <= 0 || N2_api <= 1) return 0;
+    return ((SF * Pe_warm * Math.pow(D_mm, 3)) / (8 * E_mpa) / (N2_api - 1)) * cov_s[k];
+  });
+
+  // ── API-620 Area Check (cols Z, AA, AB in Excel Sheet6) ──────────────────
+  // Col Z  = A_req  = (Pe_warm * Ls * D_mm) / (2 * 103.42)   [mm²]
+  //   103.42 MPa = hardcoded allowable shear stress from Excel
+  // Col AA = A_prov = tw*hw + tf*bf + beff*ts                 [mm²]
+  // Col AB = Check  : OK if A_prov >= A_req
+  var TAU_ALLOW = 103.42;  // MPa – allowable shear stress (Excel col Z constant)
+  var Areq_s = sAct.map(function(d, k) {
+    if (cov_s[k] <= 0) return 0;
+    return (Pe_warm * cov_s[k] * D_mm) / (2 * TAU_ALLOW);
+  });
+  var Aprov_s = sAct.map(function(d, k) {
+    // AA = tw*hw + tf*bf + beff*ts
+    return d.tw * d.hw + d.tf * d.bf + beff_s[k] * d.ts;
+  });
+
+  // ── Populate the always-visible Area Check Summary panel ─────────────────
+  var areaRowsEl = document.getElementById('areaCheckRows');
+  if (areaRowsEl) {
+    if (sAct.length === 0) {
+      areaRowsEl.innerHTML = '<span style="color:var(--muted)">No active stiffeners.</span>';
+    } else {
+      areaRowsEl.innerHTML = sAct.map(function(d, k) {
+        var areq  = Areq_s[k];
+        var aprov = Aprov_s[k];
+        var ok    = aprov >= areq;
+        var color = ok ? '#008060' : '#cc2200';
+        var bg    = ok ? 'rgba(0,180,100,0.08)' : 'rgba(200,40,0,0.08)';
+        var border= ok ? '#00b064' : '#cc2200';
+        return '<div style="padding:10px 14px;border-radius:8px;background:' + bg + ';border:1.5px solid ' + border + ';min-width:180px">'
+          + '<div style="font-weight:700;color:var(--text);margin-bottom:4px">Stiffener ' + (k+1) + ' @ ' + d.loc + ' mm</div>'
+          + '<div style="color:var(--muted)">L<sub style="font-size:9px">s</sub> = ' + cov_s[k].toFixed(0) + ' mm</div>'
+          + '<div style="color:var(--text)">A<sub style="font-size:9px">req</sub> = <b>' + areq.toFixed(2) + '</b> mm²</div>'
+          + '<div style="color:var(--text)">A<sub style="font-size:9px">prov</sub> = <b>' + aprov.toFixed(2) + '</b> mm²</div>'
+          + '<div style="margin-top:6px;font-weight:700;font-size:13px;color:' + color + '">' + (ok ? '✓ OK' : '✗ FAIL') + '</div>'
+          + '</div>';
+      }).join('');
+    }
+  }
 
   // ── Ifinal composite T-section (Excel Dxxx Ifinal rows) ──────────────────
   function calcIfinal(beff, ts, tw, hw, tf, bf) {
@@ -5145,6 +5331,10 @@ function computeStiffeners() {
       var aj_v='—', ajtj_v='—', cov_v='—', NR_v='—',
           Ireq_v='—', beff_v='—', Iprov_v='—', wt_v='—', ok=false;
       var badge = '<span class="badge badge-info" style="opacity:0.35">—</span>';
+      var Ls_api_v='—', N2_api_v='—', Ireq_api_v='—', okAPI=false;
+      var badgeAPI = '<span class="badge badge-info" style="opacity:0.35">—</span>';
+      var Areq_v='—', Aprov_v='—', okArea=false;
+      var badgeArea = '<span class="badge badge-info" style="opacity:0.35">—</span>';
 
       if (isA && k >= 0) {
         aj_v    = aj_s[k].toFixed(0);
@@ -5161,6 +5351,19 @@ function computeStiffeners() {
         wt_v    = wt_s[k].toFixed(1);
         ok      = Iprov_s[k] >= Ireq_s[k];
         badge   = '<span class="badge '+(ok?'badge-safe':'badge-fail')+'">'+(ok?'✓ OK':'✗ FAIL')+'</span>';
+        // API-620 yellow section
+        Ls_api_v   = cov_s[k].toFixed(0);
+        N2_api_v   = N2_api.toFixed(2);
+        Ireq_api_v = Ireq_api_s[k] < 1e6
+                       ? Ireq_api_s[k].toFixed(0)
+                       : Ireq_api_s[k].toExponential(3);
+        okAPI      = Iprov_s[k] >= Ireq_api_s[k];
+        badgeAPI   = '<span class="badge '+(okAPI?'badge-safe':'badge-fail')+'">'+(okAPI?'✓ OK':'✗ FAIL')+'</span>';
+        // API-620 Area Check (cols Z, AA, AB)
+        Areq_v  = Areq_s[k].toFixed(2);
+        Aprov_v = Aprov_s[k].toFixed(2);
+        okArea  = Aprov_s[k] >= Areq_s[k];
+        badgeArea = '<span class="badge '+(okArea?'badge-safe':'badge-fail')+'">'+(okArea?'✓ OK':'✗ FAIL')+'</span>';
       }
 
       var IprovColor = isA ? (ok ? 'var(--ok)' : 'var(--fail)') : 'var(--muted)';
@@ -5195,7 +5398,14 @@ function computeStiffeners() {
         +'<td style="text-align:right;font-family:\'IBM Plex Mono\',monospace;color:var(--accent2);font-size:12px">'+Ireq_v+'</td>'
         +'<td style="text-align:right;font-family:\'IBM Plex Mono\',monospace;color:'+IprovColor+';font-weight:700;font-size:12px">'+Iprov_v+'</td>'
         +cvCell(wt_v)
-        +'<td>'+badge+'</td>';
+        +'<td>'+badge+'</td>'
+        +'<td style="text-align:right;font-family:\'IBM Plex Mono\',monospace;font-size:12px;background:var(--bg3);border-left:3px solid var(--accent2)">'+Ls_api_v+'</td>'
+        +'<td style="text-align:right;font-family:\'IBM Plex Mono\',monospace;font-size:12px;background:var(--bg3);color:var(--accent2);font-weight:600">'+N2_api_v+'</td>'
+        +'<td style="text-align:right;font-family:\'IBM Plex Mono\',monospace;font-size:12px;background:var(--bg3);color:var(--accent2)">'+Ireq_api_v+'</td>'
+        +'<td style="background:var(--bg3)">'+badgeAPI+'</td>'
+        +'<td style="text-align:right;font-family:\'IBM Plex Mono\',monospace;font-size:12px;background:var(--bg3);border-left:3px solid var(--warn);color:var(--warn)">'+Areq_v+'</td>'
+        +'<td style="text-align:right;font-family:\'IBM Plex Mono\',monospace;font-size:12px;background:var(--bg3);color:var(--text);font-weight:700">'+Aprov_v+'</td>'
+        +'<td style="background:var(--bg3)">'+badgeArea+'</td>';
       sizingTbody.appendChild(tr);
     }
   }
