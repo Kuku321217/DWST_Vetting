@@ -3456,6 +3456,40 @@ function exportPDF() {
     margin:{left:14}, tableWidth: W-28 });
   y = doc.lastAutoTable.finalY + 5;
 
+  // === SECTION 3B: Annular & Bottom Plate Design (Tab 2 § 2.2/2.3) ===
+  checkPage(60);
+  addTitle('3B. Annular & Bottom Plate Design (API-620 §2.2 / §2.3)');
+  const annData = [
+    ['Shell plate thickness, bottom course (corroded)', 't_s = adopted t (Course 1) − CA', (document.getElementById('ap_ts')?.textContent || '—'), 'mm'],
+    ['Stress in first shell course (Table 5.1a, Design)', '2.6·D·H·G / t_s', (document.getElementById('ap_stress')?.textContent || '—'), 'lbf/in²'],
+    ['Annular plate thickness required (min, Table Q-4.A)', 'user input', (document.getElementById('ap_treq_o')?.textContent || '—'), 'mm'],
+    ['Provided annular plate thickness', 'user input', (document.getElementById('ap_tprov_o')?.textContent || '—'), 'mm'],
+    ['Radial width between inside of shell and lap joint', 'MAX(390·t_a/√(H·G), 600)', (document.getElementById('ap_radW')?.textContent || '—'), 'mm'],
+    ['Maximum radial width (inside shell to lap)', '0.035·D', (document.getElementById('ap_maxW')?.textContent || '—'), 'mm'],
+    ['Bottom plate to annular plate lap', 'user input', (document.getElementById('ap_lap_o')?.textContent || '—'), 'mm'],
+    ['Minimum projection outside the shell', 'user input', (document.getElementById('ap_proj_o')?.textContent || '—'), 'mm'],
+    ['Required width of annular plate (Cl. 5.5.2)', 'MIN(radW + lap + t_s + proj, maxW)', (document.getElementById('ap_reqW')?.textContent || '—'), 'mm'],
+  ];
+  doc.autoTable({ startY: y, head:[['Parameter','Formula / Clause','Value','Unit']], body: annData,
+    headStyles:{fillColor:[30,48,80],textColor:255,fontSize:8},
+    bodyStyles:{fontSize:8}, alternateRowStyles:{fillColor:[240,244,255]},
+    columnStyles:{0:{cellWidth:95},1:{cellWidth:90},3:{cellWidth:18}}, margin:{left:14}, tableWidth: W-28 });
+  y = doc.lastAutoTable.finalY + 5;
+
+  checkPage(30);
+  doc.setFontSize(9); doc.setTextColor(30,60,120); doc.setFont(undefined,'bold');
+  doc.text('Bottom Plate Design — Plate Weights', 14, y); y += 6;
+  doc.setFont(undefined,'normal');
+  const botData = [
+    ['Weight of annular plate', '(π·(D_b² − D_i²)·ρ·10⁻⁹)·t_a / 4', (document.getElementById('bp_wt_ann')?.textContent || '—')],
+    ['Weight of bottom plate', '(π·D_i²·ρ·10⁻⁹·t_bot) / 4', (document.getElementById('bp_wt_bot')?.textContent || '—')],
+  ];
+  doc.autoTable({ startY: y, head:[['Component','Formula','Weight (kg)']], body: botData,
+    headStyles:{fillColor:[20,80,60],textColor:255,fontSize:8},
+    bodyStyles:{fontSize:8}, alternateRowStyles:{fillColor:[235,255,245]},
+    margin:{left:14}, tableWidth: W-28 });
+  y = doc.lastAutoTable.finalY + 5;
+
   // === SECTION 4: Seismic ===
   checkPage(50);
   addTitle('4. Seismic Analysis Results');
@@ -4118,6 +4152,29 @@ async function exportWord() {
       blank(),
     ];
 
+    /* §3B  Annular & Bottom Plate Design (Tab 2 § 2.2/2.3) */
+    const sec3b = [
+      h2('3B. Annular & Bottom Plate Design (API-620 §2.2 / §2.3)'),
+      mkTable(['Parameter','Formula / Clause','Value','Unit'], [
+        ['Shell plate thickness, bottom course (corroded)', 't_s = adopted t (Course 1) − CA', t('ap_ts'), 'mm'],
+        ['Stress in first shell course (Table 5.1a, Design)', '2.6·D·H·G / t_s', t('ap_stress'), 'lbf/in²'],
+        ['Annular plate thickness required (min, Table Q-4.A)', 'user input', t('ap_treq_o'), 'mm'],
+        ['Provided annular plate thickness', 'user input', t('ap_tprov_o'), 'mm'],
+        ['Radial width between inside of shell and lap joint', 'MAX(390·t_a/√(H·G), 600)', t('ap_radW'), 'mm'],
+        ['Maximum radial width (inside shell to lap)', '0.035·D', t('ap_maxW'), 'mm'],
+        ['Bottom plate to annular plate lap', 'user input', t('ap_lap_o'), 'mm'],
+        ['Minimum projection outside the shell', 'user input', t('ap_proj_o'), 'mm'],
+        ['Required width of annular plate (Cl. 5.5.2)', 'MIN(radW + lap + t_s + proj, maxW)', t('ap_reqW'), 'mm'],
+      ]),
+      blank(),
+      para('Bottom Plate Design — Plate Weights', { bold: true, color: C_BLUE }),
+      mkTable(['Component','Formula','Weight (kg)'], [
+        ['Weight of annular plate', '(π·(D_b² − D_i²)·ρ·10⁻⁹)·t_a / 4', t('bp_wt_ann')],
+        ['Weight of bottom plate', '(π·D_i²·ρ·10⁻⁹·t_bot) / 4', t('bp_wt_bot')],
+      ]),
+      blank(),
+    ];
+
     /* §4  Seismic Analysis */
     const seisRows = tr2('seismicResultsBody').filter(r => r.length >= 5);
     const Ti_val = v('s_Ti_calc');
@@ -4364,7 +4421,7 @@ async function exportWord() {
 
     /* ── STEP 3: Build Document with ALL children in constructor ─────── */
     const allChildren = [
-      ...sec1, ...sec2, ...sec3, ...sec3a, ...sec4, ...sec5,
+      ...sec1, ...sec2, ...sec3, ...sec3a, ...sec3b, ...sec4, ...sec5,
       ...sec67, ...sec8, ...sec9, ...sec10, ...sec11, ...sec12, ...sec13, ...sec14,
     ];
 
